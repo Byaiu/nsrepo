@@ -37,8 +37,15 @@
 #include "ns3/lte-mac-sap.h"
 #include <ns3/lte-common.h>
 
+#include "ns3/global-value.h"
+#include "ns3/integer.h"
 
 namespace ns3 {
+
+ns3::GlobalValue g_LteEnb_Cfi("LteEnbCfi",
+                              "The CFI value for eNB",
+                              IntegerValue (3),
+                              MakeIntegerChecker<int32_t> ());
 
 NS_LOG_COMPONENT_DEFINE ("LteEnbMac");
 

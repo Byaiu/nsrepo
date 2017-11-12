@@ -30,7 +30,8 @@
 #include <cfloat>
 #include <set>
 
-
+#include "ns3/global-value.h"
+#include "ns3/integer.h"
 namespace ns3 {
 
 NS_LOG_COMPONENT_DEFINE ("PfFfMacScheduler");
@@ -643,6 +644,13 @@ PfFfMacScheduler::RefreshHarqProcesses ()
 
 }
 
+uint8_t ceil_28(uint8_t in)
+{
+  if (in > 28)
+    return 28;
+  else
+    return in;
+}
 
 void
 PfFfMacScheduler::DoSchedDlTriggerReq (const struct FfMacSchedSapProvider::SchedDlTriggerReqParameters& params)
@@ -1274,11 +1282,38 @@ PfFfMacScheduler::DoSchedDlTriggerReq (const struct FfMacSchedSapProvider::Sched
       uint32_t bytesTxed = 0;
       for (uint8_t j = 0; j < nLayer; j++)
         {
-          newDci.m_mcs.push_back (m_amc->GetMcsFromCqi (worstCqi.at (j)));
-          int tbSize = (m_amc->GetTbSizeFromMcs (newDci.m_mcs.at (j), RgbPerRnti * rbgSize) / 8); // (size of TB in bytes according to table 7.1.7.2.1-1 of 36.213)
-          newDci.m_tbsSize.push_back (tbSize);
-          NS_LOG_INFO (this << " Layer " << (uint16_t)j << " MCS selected" << m_amc->GetMcsFromCqi (worstCqi.at (j)));
-          bytesTxed += tbSize;
+          IntegerValue cfi;
+          GlobalValue::GetValueByName("LteEnbCfi", cfi);
+          int32_t cfi_value = cfi.Get();
+          if (cfi_value == 1)
+            {
+              uint8_t tmp_mcs = ceil_28(m_amc->GetMcsFromCqi (worstCqi.at (j)) + 2);
+              newDci.m_mcs.push_back (tmp_mcs);
+              int tbSize = (m_amc->GetTbSizeFromMcs (newDci.m_mcs.at (j), RgbPerRnti * rbgSize) / 8); // (size of TB in bytes according to table 7.1.7.2.1-1 of 36.213)
+              newDci.m_tbsSize.push_back (tbSize);
+              NS_LOG_WARN ("cfi " << cfi_value << " " << this << " Layer " << (uint16_t)j <<
+                           " MCS selected " << static_cast<int>(tmp_mcs));
+              bytesTxed += tbSize;
+            }
+          else if (cfi_value == 2)
+            {
+              uint8_t tmp_mcs = ceil_28 (m_amc->GetMcsFromCqi (worstCqi.at (j)) + 1);
+              newDci.m_mcs.push_back (tmp_mcs);
+              int tbSize = (m_amc->GetTbSizeFromMcs (newDci.m_mcs.at (j), RgbPerRnti * rbgSize) / 8); // (size of TB in bytes according to table 7.1.7.2.1-1 of 36.213)
+              newDci.m_tbsSize.push_back (tbSize);
+              NS_LOG_WARN ("cfi " << cfi_value << " " << this << " Layer " << (uint16_t)j <<
+                           " MCS selected " << static_cast<int>(tmp_mcs) );
+              bytesTxed += tbSize;
+            }
+          else
+            {
+              newDci.m_mcs.push_back (m_amc->GetMcsFromCqi (worstCqi.at (j)));
+              int tbSize = (m_amc->GetTbSizeFromMcs (newDci.m_mcs.at (j), RgbPerRnti * rbgSize) / 8); // (size of TB in bytes according to table 7.1.7.2.1-1 of 36.213)
+              newDci.m_tbsSize.push_back (tbSize);
+              NS_LOG_WARN ("cfi " << cfi_value << " " << this << " Layer " << (uint16_t)j <<
+                           " MCS selected " << m_amc->GetMcsFromCqi (worstCqi.at (j)));
+              bytesTxed += tbSize;
+            }
         }
 
       newDci.m_resAlloc = 0;  // only allocation type 0 at this stage
