@@ -7,6 +7,16 @@ all:
 configure:
 	./waf configure --enable-examples --enable-tests
 
+config-debug:
+	./waf configure --build-profile=debug --out=build/debug
+build-debug: config-debug
+	./waf 
+
+config-opt:
+	./waf configure --build-profile=optimized --out=build/optimized 
+build-opt: config-opt
+	./waf 
+
 build:
 	./waf build
 

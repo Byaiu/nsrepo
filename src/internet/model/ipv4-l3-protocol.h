@@ -35,6 +35,7 @@
 #include "ns3/nstime.h"
 #include "ns3/simulator.h"
 
+
 class Ipv4L3ProtocolTestCase;
 
 namespace ns3 {
@@ -51,7 +52,7 @@ class Socket;
 class Ipv4RawSocketImpl;
 class IpL4Protocol;
 class Icmpv4L4Protocol;
-
+class Ipv4Netfilter;
 
 /**
  * \brief Implement the Ipv4 layer.
@@ -125,6 +126,9 @@ public:
 
   virtual Ptr<IpL4Protocol> GetProtocol (int protocolNumber) const;
   virtual Ptr<IpL4Protocol> GetProtocol (int protocolNumber, int32_t interfaceIndex) const;
+
+  virtual void SetNetfilter (Ptr<Ipv4Netfilter> netfilter);
+  virtual Ptr<Ipv4Netfilter> GetNetfilter (void) const;
 
   virtual Ipv4Address SourceAddressSelection (uint32_t interface, Ipv4Address dest);
 
@@ -485,6 +489,7 @@ private:
   TracedCallback<const Ipv4Header &, Ptr<const Packet>, DropReason, Ptr<Ipv4>, uint32_t> m_dropTrace;
 
   Ptr<Ipv4RoutingProtocol> m_routingProtocol; //!< Routing protocol associated with the stack
+  Ptr<Ipv4Netfilter> m_netfilter;
 
   SocketList m_sockets; //!< List of IPv4 raw sockets.
 

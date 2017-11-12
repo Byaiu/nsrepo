@@ -12829,6 +12829,17 @@ def register_Ns3Ipv4_methods(root_module, cls):
                    'void', 
                    [param('bool', 'model')], 
                    is_pure_virtual=True, visibility='private', is_virtual=True)
+
+    ## ipv4.h (module 'internet'): ns3::Ptr<ns3::Ipv4Netfilter> ns3::Ipv4::GetNetfilter() const [member function]
+    cls.add_method('GetNetfilter', 
+                   'ns3::Ptr< ns3::Ipv4Netfilter >', 
+                   [], 
+                   is_pure_virtual=True, is_const=True, is_virtual=True)
+    ## ipv4.h (module 'internet'): void ns3::Ipv4::SetNetfilter(ns3::Ptr<ns3::Ipv4Netfilter> netfilter) [member function]
+    cls.add_method('SetNetfilter', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::Ipv4Netfilter >', 'netfilter')], 
+                   is_pure_virtual=True, is_virtual=True)
     return
 
 def register_Ns3Ipv4AddressChecker_methods(root_module, cls):
@@ -13208,6 +13219,17 @@ def register_Ns3Ipv4L3Protocol_methods(root_module, cls):
                    'void', 
                    [param('bool', 'model')], 
                    visibility='private', is_virtual=True)
+
+    ## ipv4-l3-protocol.h (module 'internet'): ns3::Ptr<ns3::Ipv4Netfilter> ns3::Ipv4L3Protocol::GetNetfilter() const [member function]
+    cls.add_method('GetNetfilter', 
+                   'ns3::Ptr< ns3::Ipv4Netfilter >', 
+                   [], 
+                   is_const=True, is_virtual=True)
+    ## ipv4-l3-protocol.h (module 'internet'): void ns3::Ipv4L3Protocol::SetNetfilter(ns3::Ptr<ns3::Ipv4Netfilter> netfilter) [member function]
+    cls.add_method('SetNetfilter', 
+                   'void', 
+                   [param('ns3::Ptr< ns3::Ipv4Netfilter >', 'netfilter')], 
+                   is_virtual=True)
     return
 
 def register_Ns3Ipv4MaskChecker_methods(root_module, cls):
