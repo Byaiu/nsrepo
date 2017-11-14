@@ -13,17 +13,31 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
  */
+#include <memory>
 
 #include "ns3/core-module.h"
 
+using namespace std;
 using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("ScratchSimulator");
+
+//CommandLine*
+//parseCommand ()
+//{
+//  CommandLine* cmd = new CommandLine;
+//
+//  return cmd;
+//}
 
 int 
 main (int argc, char *argv[])
 {
   NS_LOG_UNCOND ("Scratch Simulator");
+
+  CommandLine cmd;
+
+  cmd.Parse(argc, argv);
 
   Simulator::Run ();
   Simulator::Destroy ();

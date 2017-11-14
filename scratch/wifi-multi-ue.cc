@@ -127,18 +127,7 @@ main (int argc, char *argv[])
 
   //-----------------------------
   // Global Value Setting
-  uint32_t cfi = 1;
-  if (nUE > 10)
-    {
-      cfi = 2;
-    }
-  else if (nUE > 20)
-    {
-      cfi = 3;
-    }
-  IntegerValue cfiValue;
-  cfiValue.Set(cfi);
-  GlobalValue::Bind("LteEnbCfi", cfiValue);
+
 
   //-----------------------------
   // Configure Default

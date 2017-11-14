@@ -100,9 +100,9 @@ main (int argc, char *argv[])
 
   MobilityHelper mobility;
   mobility.SetPositionAllocator ("ns3::UniformDiscPositionAllocator",
-																														 "rho", DoubleValue (10),
-																														 "X",   DoubleValue (10),
-																														 "Y",   DoubleValue (20));
+																 "rho", DoubleValue (10),
+																 "X",   DoubleValue (10),
+																 "Y",   DoubleValue (20));
   mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
   mobility.Install (wifi_sta_node);
 
