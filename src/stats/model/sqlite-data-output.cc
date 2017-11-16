@@ -20,6 +20,10 @@
 
 #include <sstream>
 
+#include <unistd.h>
+#include <sys/file.h>
+#include <iostream>
+
 #include <sqlite3.h>
 
 #include "ns3/log.h"
@@ -115,6 +119,12 @@ void
 SqliteDataOutput::Output (DataCollector &dc)
 {
   NS_LOG_FUNCTION (this << &dc);
+  int fd = open("./dblock", O_RDONLY);
+  if (fd == -1)
+    {
+      std::cerr << "error when create dblock" << std::endl;
+    }
+  flock(fd, LOCK_EX);
 
   std::string m_dbFile = m_filePrefix + ".db";
 
@@ -156,6 +166,7 @@ SqliteDataOutput::Output (DataCollector &dc)
   Exec ("COMMIT");
 
   sqlite3_close (m_db);
+  flock(fd, LOCK_UN);
 
   // end SqliteDataOutput::Output
 }
