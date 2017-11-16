@@ -16,6 +16,8 @@ using namespace ns3;
 
 NS_LOG_COMPONENT_DEFINE ("'WifiLte'");
 
+#define D NS_LOG_UNCOND
+
 void
 PrintAddress (Ipv4InterfaceContainer& iifc)
 {
@@ -50,19 +52,18 @@ main (int argc, char *argv[])
 
   CommandLine cmd;
   
-  bool verbose = false;
-  cmd.AddValue ("verbose", "Tell echo applications to log if true", verbose);
-
   double simTime = 10;
   cmd.AddValue ("simTime", "Simulation Time", simTime);
 
-  cmd.Parse (argc, argv);
+  uint32_t nUE = 5;
+  cmd.AddValue ("nUE", "UE number", nUE);
 
-  if (verbose)
-    {
-      LogComponentEnable ("ExpAppSender", LOG_LEVEL_INFO);
-      LogComponentEnable ("ExpAppReceiver", LOG_LEVEL_INFO);
-    }
+  uint16_t sizemin = 1200;
+  cmd.AddValue ("sizemin", "Packet size min", sizemin);
+  uint16_t sizemax = 1300;
+  cmd.AddValue ("sizemax", "Packet size min", sizemax);
+
+  cmd.Parse (argc, argv);
 
 
 //-----------------------------
@@ -75,9 +76,10 @@ main (int argc, char *argv[])
 
   // Wifi
   NodeContainer wifi_sta_node;
-  wifi_sta_node.Create (3);
+  wifi_sta_node.Create (nUE);
   NodeContainer wifi_ap_node;
   wifi_ap_node.Create(1);
+  Ptr<Node> relay = wifi_ap_node.Get(0);
 
   // LTE
   NodeContainer lte_ue_node;
@@ -101,7 +103,7 @@ main (int argc, char *argv[])
   MobilityHelper mobility;
   mobility.SetPositionAllocator ("ns3::UniformDiscPositionAllocator",
 																 "rho", DoubleValue (10),
-																 "X",   DoubleValue (10),
+																 "X",   DoubleValue (30),
 																 "Y",   DoubleValue (20));
   mobility.SetMobilityModel ("ns3::ConstantPositionMobilityModel");
   mobility.Install (wifi_sta_node);
@@ -179,10 +181,6 @@ main (int argc, char *argv[])
 
   Ipv4InterfaceContainer lte_ue_interface = epcHelper->AssignUeIpv4Address (lte_ue_device);
 
-  NS_LOG_UNCOND ("UE lte interface");
-  NS_LOG_UNCOND ( lte_ue_node.Get(0)->GetId() << " : " << GetInterfaceFromNodeAndDevice (lte_ue_node.Get(0), lte_ue_device.Get(0)));
-  NS_LOG_UNCOND ("UE Ap interface");
-  NS_LOG_UNCOND (wifi_ap_node.Get(0)->GetId() << " : "<< GetInterfaceFromNodeAndDevice (wifi_ap_node.Get(0), wifi_ap_device.Get(0)));
 
   // Set the default gateway for each UE
 	for (uint32_t u = 0; u < lte_ue_node.GetN (); ++u)
@@ -197,7 +195,7 @@ main (int argc, char *argv[])
 	for (uint16_t i = 0; i < lte_ue_device.GetN (); i++)
 		{
 			lteHelper->Attach (lte_ue_device.Get (i), lte_enb_device.Get (0));
-		}
+    }
 
 
 //-----------------------------
@@ -205,44 +203,50 @@ main (int argc, char *argv[])
 	Ipv4NatHelper natHelper;
 	Ptr<Ipv4Nat> nat = natHelper.Install (wifi_ap_node.Get(0));
   nat->SetInside (GetInterfaceFromNodeAndDevice (wifi_ap_node.Get (0), wifi_ap_device.Get(0)));
-  NS_LOG_UNCOND ("Inside -> " << GetInterfaceFromNodeAndDevice (wifi_ap_node.Get (0), wifi_ap_device.Get(0)));
   nat->SetOutside (GetInterfaceFromNodeAndDevice (wifi_ap_node.Get (0), lte_ue_device.Get(0)));
-  NS_LOG_UNCOND ("Outside -> " << GetInterfaceFromNodeAndDevice (wifi_ap_node.Get (0), lte_ue_device.Get(0)));
-  Ipv4StaticNatRule rule (wifi_sta_interface.GetAddress (0), 8080, lte_ue_interface.GetAddress (0), 9, 0);
-  nat->AddStaticRule (rule);
-  Ptr<OutputStreamWrapper> natStream = Create<OutputStreamWrapper> ("nat.rules", std::ios::out);
-  nat->PrintTable (natStream);
-  //system ("cat nat.rules && echo && rm nat.rules");
 
 //-----------------------------
 // Application
-  ExpAppSenderHelper sender;
-  sender.SetAttribute ("Port", UintegerValue (9));
-  sender.SetAttribute ("PacketSize", StringValue ("ns3::UniformRandomVariable[Min=1200|Max=1300]"));
-  sender.SetAttribute ("Interval", StringValue ("ns3::ExponentialRandomVariable[Mean=0.01]"));
-
-  ExpAppReceiverHelper receiver (8080);
 
   ApplicationContainer receiverApps;
   ApplicationContainer senderApps;
 
-  receiverApps.Add (receiver.Install (wifi_sta_node.Get (0)));
-  sender.SetAttribute ("Destination", Ipv4AddressValue (lte_ue_interface.GetAddress (0)));
-  NS_LOG_UNCOND ("--- UE Interface ");
-  PrintAddress(lte_ue_interface);
-  senderApps.Add (sender.Install (remoteHost));
-  NS_LOG_UNCOND ("--- Sta Interface ");
-  PrintAddress (wifi_sta_interface);
+  ExpAppSenderHelper sender;
+  Ipv4Address ap_addr = lte_ue_interface.GetAddress(0);
+  sender.SetAttribute ("Destination", Ipv4AddressValue (ap_addr));
+  sender.SetAttribute ("PacketSize", StringValue ("ns3::UniformRandomVariable[Min=1200|Max=1300]"));
+  sender.SetAttribute ("Interval", StringValue ("ns3::ExponentialRandomVariable[Mean=0.01]"));
+
+  Ptr<Ipv4StaticRouting> ap_route = ipv4RoutingHelper.GetStaticRouting (
+      lte_ue_node.Get (0)->GetObject<Ipv4> ());
+
+
+  ExpAppReceiverHelper receiver (8080);
+
+  for (size_t i = 0; i < wifi_sta_node.GetN(); ++i)
+    {
+      sender.SetAttribute("Port", UintegerValue(9 + i));
+      senderApps.Add(sender.Install(remoteHost));
+      receiverApps.Add(receiver.Install(wifi_sta_node.Get(i)));
+      Ipv4StaticNatRule rule(wifi_sta_interface.GetAddress(i), 8080, ap_addr, 9 + i, 0);
+      nat->AddStaticRule(rule);
+    }
+
+  Ptr<OutputStreamWrapper> natStream = Create<OutputStreamWrapper> ("nat.rules", std::ios::out);
+  nat->PrintTable (natStream);
+
+//
+//  NS_LOG_UNCOND ("--- UE Interface ");
+//  PrintAddress(lte_ue_interface);
+//  senderApps.Add (sender.Install (remoteHost));
+//  NS_LOG_UNCOND ("--- Sta Interface ");
+//  PrintAddress (wifi_sta_interface);
 
   receiverApps.Start(Seconds(0.1));
   receiverApps.Stop(Seconds(simTime));
   senderApps.Start(Seconds(0.1));
   senderApps.Stop(Seconds(simTime));
 
-  Ptr<Ipv4StaticRouting> ap_ue_static_route = ipv4RoutingHelper.GetStaticRouting (
-      lte_ue_node.Get (0)->GetObject<Ipv4> ());
-  ap_ue_static_route->AddNetworkRouteTo (Ipv4Address ("192.168.1.0"), Ipv4Mask ("255.255.255.0"),
-                                         GetInterfaceFromNodeAndDevice (wifi_ap_node.Get (0), wifi_ap_device.Get (0)));
 //-----------------------------
 // Statisitcs
 
@@ -250,7 +254,6 @@ main (int argc, char *argv[])
 //-----------------------------
 // Simulation Configuration
 
-  NS_LOG_UNCOND ("==================Wifi Lte END================");
   Simulator::Stop (Seconds (simTime));
   Simulator::Run ();
   Simulator::Destroy ();
