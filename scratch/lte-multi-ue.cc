@@ -72,11 +72,11 @@ const std::string currentDateTime()
   os << ts.tv_sec << '-' << ts.tv_nsec;
   return std::string(os.str());
 }
-
+#define D NS_LOG_UNCOND
 int
 main (int argc, char *argv[])
 {
-  NS_LOG_UNCOND("==== eNB -- UEs");
+  D("==== eNB -- UEs");
 //-----------------------------
 // Command Line
 
@@ -125,6 +125,7 @@ main (int argc, char *argv[])
   packetsize_s << "ns3::UniformRandomVariable[Min=" << sizemin << "|Max=" << sizemax << "]";
   std::string packetsize = packetsize_s.str ();
   NS_LOG_DEBUG(packetsize);
+  D("Number of UE " << nUE);
 
   //-----------------------------
   // Global Value Setting
@@ -144,7 +145,7 @@ main (int argc, char *argv[])
 //-----------------------------
 // Configure Default
 
-//  Config::SetDefault ("ns3::LteEnbRrc::SrsPeriodicity", UintegerValue (320));
+  Config::SetDefault ("ns3::LteEnbRrc::SrsPeriodicity", UintegerValue (320));
 //  Config::SetDefault ("ns3::PhyStatsCalculator::DlRsrpSinrFilename", StringValue ("lte-multi-ue-dl-rsrp"));
 //  Config::SetDefault ("ns3::PhyStatsCalculator::UlSinrFilename", StringValue ("lte-multi-ue-sinr"));
 //  Config::SetDefault ("ns3::PhyStatsCalculator::UlInterferenceFilename", StringValue ("lte-multi-ue-interference"));
