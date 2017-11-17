@@ -10,7 +10,7 @@
 
 
 #include <sstream>
-
+#include <time.h>
 
 using namespace ns3;
 
@@ -35,7 +35,25 @@ GetInterfaceFromNodeAndDevice (Ptr<Node> node, Ptr<NetDevice> nd)
   return ipv4->GetInterfaceForDevice (nd);
 }
 
+void
+CountGlue (Ptr<CounterCalculator<> > datac, std::string path)
+{
+  datac->Update ();
+}
 
+void
+TimeGlue (Ptr<TimeMinMaxAvgTotalCalculator> datac, std::string path, Time t)
+{
+  datac->Update (t);
+}
+const std::string currentDateTime()
+{
+  struct timespec ts;
+  clock_gettime(CLOCK_REALTIME, &ts);
+  std::ostringstream os;
+  os << ts.tv_sec << '-' << ts.tv_nsec;
+  return std::string(os.str());
+}
 /**
  * Name Style:
  * 1. use container to access component
@@ -51,7 +69,13 @@ main (int argc, char *argv[])
 // Command Line
 
   CommandLine cmd;
-  
+
+  bool savedb = false;
+  cmd.AddValue ("savedb", "Whether to save statics to db", savedb);
+
+  bool enabletrace = false;
+  cmd.AddValue ("enabletrace", "whether to enable lte trace", enabletrace);
+
   double simTime = 10;
   cmd.AddValue ("simTime", "Simulation Time", simTime);
 
@@ -63,8 +87,24 @@ main (int argc, char *argv[])
   uint16_t sizemax = 1300;
   cmd.AddValue ("sizemax", "Packet size min", sizemax);
 
+  std::string experiment = "wifi-lte";
+  cmd.AddValue ("experiment", "Current experiment", experiment);
+
+  std::string strategy = "wifi-lte";
+  cmd.AddValue ("strategy", "The strategy used for this experment", strategy);
+
+  std::string input = "5";
+  cmd.AddValue ("input", "The input of this experiment", input);
+
+  std::string prefix = "dbstore";
+  cmd.AddValue ("prefix", "Prefix of output data file name", prefix);
+
+  std::string description;
+  cmd.AddValue ("description", "Description of a bunch of runs", description);
+
   cmd.Parse (argc, argv);
 
+  std::string runID = currentDateTime();
 
 //-----------------------------
 // Configure Default
@@ -112,7 +152,7 @@ main (int argc, char *argv[])
   positionAlloc->Add (Vector (0.0, 30.0, 0.0)); 				// for wifi_ap_node
   positionAlloc->Add (Vector (-30.0, -30.0, 0.0)); 	// for eNB
   mobility.SetPositionAllocator (positionAlloc);
-  mobility.Install (wifi_ap_node.Get (0));
+  mobility.Install (relay);
   mobility.Install (lte_enb_node.Get (0));
 
 
@@ -181,7 +221,6 @@ main (int argc, char *argv[])
 
   Ipv4InterfaceContainer lte_ue_interface = epcHelper->AssignUeIpv4Address (lte_ue_device);
 
-
   // Set the default gateway for each UE
 	for (uint32_t u = 0; u < lte_ue_node.GetN (); ++u)
 		{
@@ -201,9 +240,9 @@ main (int argc, char *argv[])
 //-----------------------------
 // NAT Utils
 	Ipv4NatHelper natHelper;
-	Ptr<Ipv4Nat> nat = natHelper.Install (wifi_ap_node.Get(0));
-  nat->SetInside (GetInterfaceFromNodeAndDevice (wifi_ap_node.Get (0), wifi_ap_device.Get(0)));
-  nat->SetOutside (GetInterfaceFromNodeAndDevice (wifi_ap_node.Get (0), lte_ue_device.Get(0)));
+	Ptr<Ipv4Nat> nat = natHelper.Install (relay);
+  nat->SetInside (GetInterfaceFromNodeAndDevice (relay, wifi_ap_device.Get(0)));
+  nat->SetOutside (GetInterfaceFromNodeAndDevice (relay, lte_ue_device.Get(0)));
 
 //-----------------------------
 // Application
@@ -215,7 +254,7 @@ main (int argc, char *argv[])
   Ipv4Address ap_addr = lte_ue_interface.GetAddress(0);
   sender.SetAttribute ("Destination", Ipv4AddressValue (ap_addr));
   sender.SetAttribute ("PacketSize", StringValue ("ns3::UniformRandomVariable[Min=1200|Max=1300]"));
-  sender.SetAttribute ("Interval", StringValue ("ns3::ExponentialRandomVariable[Mean=0.01]"));
+  sender.SetAttribute ("Interval", StringValue ("ns3::ExponentialRandomVariable[Mean=0.005]"));
 
   Ptr<Ipv4StaticRouting> ap_route = ipv4RoutingHelper.GetStaticRouting (
       lte_ue_node.Get (0)->GetObject<Ipv4> ());
@@ -232,9 +271,12 @@ main (int argc, char *argv[])
       nat->AddStaticRule(rule);
     }
 
-  Ptr<OutputStreamWrapper> natStream = Create<OutputStreamWrapper> ("nat.rules", std::ios::out);
-  nat->PrintTable (natStream);
-
+  if (!savedb)
+    {
+      Ptr<OutputStreamWrapper> natStream = Create<OutputStreamWrapper> ("nat.rules", std::ios::out);
+      nat->PrintTable (natStream);
+    }
+  
 //
 //  NS_LOG_UNCOND ("--- UE Interface ");
 //  PrintAddress(lte_ue_interface);
@@ -250,11 +292,62 @@ main (int argc, char *argv[])
 //-----------------------------
 // Statisitcs
 
+  DataCollector data;
+  data.DescribeRun (experiment, strategy, input, runID, description);
+
+  std::ostringstream contextstream;
+  contextstream << "ue-" << nUE << "=" << strategy;
+  std::string context = contextstream.str();
+  if (savedb)
+    {
+
+      // Sender packets
+      Ptr<PacketSizeMinMaxAvgTotalCalculator> totalTx = CreateObject<PacketSizeMinMaxAvgTotalCalculator> ();
+      totalTx->SetKey ("SendPackets");
+      totalTx->SetContext (context);
+      Config::Connect ("/NodeList/*/ApplicationList/*/$ns3::ExpAppSender/Tx",
+                       MakeCallback (&PacketSizeMinMaxAvgTotalCalculator::PacketUpdate, totalTx));
+      data.AddDataCalculator (totalTx);
+
+      // Receiver packets
+      Ptr<PacketSizeMinMaxAvgTotalCalculator> totalRx = CreateObject<PacketSizeMinMaxAvgTotalCalculator> ();
+      totalRx->SetKey ("ReceivePackets");
+      totalRx->SetContext (context);
+      Config::Connect ("/NodeList/*/ApplicationList/*/$ns3::ExpAppReceiver/RxPacket",
+                       MakeCallback (&PacketSizeMinMaxAvgTotalCalculator::PacketUpdate, totalRx));
+      data.AddDataCalculator (totalRx);
+
+      // Receiver time
+      Ptr<TimeMinMaxAvgTotalCalculator> delayStat = CreateObject<TimeMinMaxAvgTotalCalculator> ();
+      delayStat->SetKey ("Delay");
+      delayStat->SetContext (context);
+      Config::Connect ("/NodeList/*/ApplicationList/*/$ns3::ExpAppReceiver/RxTime",
+                       MakeBoundCallback (&TimeGlue, delayStat));
+      data.AddDataCalculator (delayStat);
+    }
+
+  if (enabletrace)
+    {
+      lteHelper->EnablePdcpTraces();
+      lteHelper->EnableRlcTraces();
+      lteHelper->EnableMacTraces();
+      lteHelper->EnablePhyTraces();
+    }
 
 //-----------------------------
 // Simulation Configuration
 
   Simulator::Stop (Seconds (simTime));
   Simulator::Run ();
+  if (savedb)
+    {
+      Ptr<DataOutputInterface> output = 0;
+      output = CreateObject<SqliteDataOutput> ();
+      output->SetFilePrefix (prefix);
+      if (output != 0)
+        output->Output (data);
+    }
   Simulator::Destroy ();
+
+  return 0;
 }

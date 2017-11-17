@@ -66,12 +66,11 @@ template<typename T>
 
 const std::string currentDateTime()
 {
-  time_t now = time(0);
-  struct tm tstruct;
-  char buf[80];
-  tstruct = *localtime(&now);
-  strftime(buf, sizeof(buf), "%Y%m%d%H%I%M%S", &tstruct);
-  return buf;
+  struct timespec ts;
+  clock_gettime(CLOCK_REALTIME, &ts);
+  std::ostringstream os;
+  os << ts.tv_sec << '-' << ts.tv_nsec;
+  return std::string(os.str());
 }
 
 int
@@ -106,14 +105,17 @@ main (int argc, char *argv[])
   std::string experiment = "lte-multi-ue";
   cmd.AddValue ("experiment", "Current experiment", experiment);
 
-  std::string strategy = "relay";
+  std::string strategy = "lte-multi-ue";
   cmd.AddValue ("strategy", "The strategy used for this experment", strategy);
 
   std::string input = "5";
   cmd.AddValue ("input", "The input of this experiment", input);
 
-  std::string prefix = "lte-multi-ue";
+  std::string prefix = "dbstore";
   cmd.AddValue ("prefix", "Prefix of output data file name", prefix);
+
+  std::string description;
+  cmd.AddValue ("description", "Description of a bunch of runs", description);
 
   cmd.Parse (argc, argv);
 
@@ -285,15 +287,18 @@ main (int argc, char *argv[])
 // Statistics
 
   DataCollector data;
-  data.DescribeRun (experiment, strategy, input, runID);
+  data.DescribeRun (experiment, strategy, input, runID, description);
 
+  std::ostringstream contextstream;
+  contextstream << "ue-" << nUE << "=" << strategy;
+  std::string context = contextstream.str();
   if (savedb)
     {
 
       // Sender packets
       Ptr<PacketSizeMinMaxAvgTotalCalculator> totalTx = CreateObject<PacketSizeMinMaxAvgTotalCalculator> ();
       totalTx->SetKey ("SendPackets");
-      totalTx->SetContext ("remote");
+      totalTx->SetContext (context);
       Config::Connect ("/NodeList/*/ApplicationList/*/$ns3::ExpAppSender/Tx",
                        MakeCallback (&PacketSizeMinMaxAvgTotalCalculator::PacketUpdate, totalTx));
       data.AddDataCalculator (totalTx);
@@ -301,7 +306,7 @@ main (int argc, char *argv[])
       // Receiver packets
       Ptr<PacketSizeMinMaxAvgTotalCalculator> totalRx = CreateObject<PacketSizeMinMaxAvgTotalCalculator> ();
       totalRx->SetKey ("ReceivePackets");
-      totalRx->SetContext ("ue");
+      totalRx->SetContext (context);
       Config::Connect ("/NodeList/*/ApplicationList/*/$ns3::ExpAppReceiver/RxPacket",
                        MakeCallback (&PacketSizeMinMaxAvgTotalCalculator::PacketUpdate, totalRx));
       data.AddDataCalculator (totalRx);
@@ -309,7 +314,7 @@ main (int argc, char *argv[])
       // Receiver time
       Ptr<TimeMinMaxAvgTotalCalculator> delayStat = CreateObject<TimeMinMaxAvgTotalCalculator> ();
       delayStat->SetKey ("Delay");
-      delayStat->SetContext ("system");
+      delayStat->SetContext (context);
       Config::Connect ("/NodeList/*/ApplicationList/*/$ns3::ExpAppReceiver/RxTime",
                        MakeBoundCallback (&TimeGlue, delayStat));
       data.AddDataCalculator (delayStat);
@@ -324,8 +329,6 @@ main (int argc, char *argv[])
     }
 //-----------------------------
 // Simulation Configuration
-
-  NS_LOG_DEBUG("======= LTE ONLY END ========");
 
   Simulator::Stop (Seconds (simTime));
   Simulator::Run ();
