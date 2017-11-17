@@ -109,7 +109,7 @@ main (int argc, char *argv[])
   std::string strategy = "wifi-multi-ue";
   cmd.AddValue ("strategy", "The strategy used for this experment", strategy);
 
-  std::string input = "5";
+  uint32_t input = 5;
   cmd.AddValue ("input", "The input of this experiment", input);
 
   std::string prefix = "dbstore";
@@ -236,7 +236,7 @@ main (int argc, char *argv[])
   // Statistics
 
   DataCollector data;
-  data.DescribeRun (experiment, strategy, input, runID, description);
+  data.DescribeRun (experiment, strategy, NumberToString(nUE), runID, description);
 
   std::ostringstream contextstream;
   contextstream << "ue-" << nUE << "=" << strategy;

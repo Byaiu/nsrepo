@@ -46,6 +46,16 @@ TimeGlue (Ptr<TimeMinMaxAvgTotalCalculator> datac, std::string path, Time t)
 {
   datac->Update (t);
 }
+
+template<typename T>
+  std::string
+  NumberToString (T Number)
+  {
+    std::ostringstream ss;
+    ss << Number;
+    return ss.str ();
+  }
+
 const std::string currentDateTime()
 {
   struct timespec ts;
@@ -93,7 +103,7 @@ main (int argc, char *argv[])
   std::string strategy = "wifi-lte";
   cmd.AddValue ("strategy", "The strategy used for this experment", strategy);
 
-  std::string input = "5";
+  uint32_t input = 5;
   cmd.AddValue ("input", "The input of this experiment", input);
 
   std::string prefix = "dbstore";
@@ -293,7 +303,7 @@ main (int argc, char *argv[])
 // Statisitcs
 
   DataCollector data;
-  data.DescribeRun (experiment, strategy, input, runID, description);
+  data.DescribeRun (experiment, strategy, NumberToString(nUE), runID, description);
 
   std::ostringstream contextstream;
   contextstream << "ue-" << nUE << "=" << strategy;

@@ -119,7 +119,7 @@ void
 SqliteDataOutput::Output (DataCollector &dc)
 {
   NS_LOG_FUNCTION (this << &dc);
-  int fd = open("./dblock", O_RDONLY);
+  int fd = open("./.dblock", O_RDONLY | O_CREAT, 0644);
   if (fd == -1)
     {
       std::cerr << "error when create dblock" << std::endl;
