@@ -1,0 +1,106 @@
+#!/usr/bin/python3
+# -*- coding: utf-8 -*-
+
+import sys, os
+import argparse
+import sqlite3 as lite
+import pprint
+
+pp = pprint.PrettyPrinter(indent=2)
+
+program = [ 
+		'lte-multi-ue', 
+		'lte-single-ue', 
+		'wifi-multi-ue', 
+		'wifi-lte',
+]
+
+
+class Cmd:
+	def __init__(self, name, nUE):
+		self.fmt = 'LD_LIBRARY_PATH=/home/baiyu/projects/ns-allinone-3.25/ns-3.25/build/optimized ./build/optimized/scratch/{name} {cmd}'
+		self.name = name
+		self.nUE = nUE
+
+	def get(self):
+		cmd = ' '.join(['--{}={}'.format(k,v) 
+			for k,v in vars(self).items()
+			if k not in ['fmt', 'name']])
+
+		return self.fmt.format(name=self.name, cmd=cmd)
+
+def parse_option():
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("-d", "--description", 
+                        help="Descripe this bunch of run",
+                        required=True)
+    
+    parser.add_argument("--sizemin", 
+                        help = "Minumum size of packets",
+                        type=int,
+                        default = 1200)
+    parser.add_argument("--sizemax", 
+                        help = "Maximum size of packets",
+                        type=int,
+                        default = 1300)
+
+    parser.add_argument("--start", 
+                        help = "The simulation start number of ue",
+                        type = int,
+                        default = 1 )
+    parser.add_argument("--step", 
+                        help = "The step number of ue",
+                        type = int,
+                        default = 1 )
+    parser.add_argument("--stop", 
+                        help = "The simulation end number of ue",
+                        type = int,
+                        default = 20 )
+
+    parser.add_argument("--truerun",
+                        help = "Truely run the protram",
+                        action = 'store_true',
+                        default = False)
+    parser.add_argument("--savedb",
+                        help = "Truely run the protram",
+                        action = 'store_true',
+                        default = False)
+
+    parser.add_argument("--simTime",
+                        help = "Simulation Time",
+                        type=float,
+                        default = 10)
+
+    args = parser.parse_args()
+    return args
+
+
+def build_cmd(opt, name, nUE):
+	c = Cmd(name, nUE)
+	c.description = opt.description
+	c.sizemin = opt.sizemin
+	c.sizemax = opt.sizemax
+	c.simTime = opt.simTime
+	if opt.savedb:
+		c.savedb = 1
+	return c.get()
+
+def main():
+	opt = parse_option()
+
+	cmds = [ build_cmd(opt, p, n) 
+				for p in program 
+				for n in range(opt.start, opt.stop, opt.step)]
+	[ print(x) for x in cmds]
+
+	if opt.truerun:
+		import concurrent.futures
+		import os
+		os.system('make build-opt')		
+		# with concurrent.futures.ProcessPoolExecutor(max_workers=4) as executor:
+		with concurrent.futures.ProcessPoolExecutor() as executor:
+			executor.map(os.system, cmds)
+
+if __name__ == '__main__':
+	main()
